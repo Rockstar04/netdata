@@ -857,7 +857,7 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 // --------------------------------------------------------------------------------------------------------------------
 // accept_socket() - accept a socket and store client IP and port
 
-int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize) {
+int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, SIMPLE_PATTERN *access_list) {
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
@@ -873,6 +873,13 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         client_port[portsize - 1] = '\0';
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
+            case AF_UNIX:
+                debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
+                // set the port - certain versions of libc return garbage on unix sockets
+                strncpy(client_port, "UNIX", portsize);
+                client_port[portsize - 1] = '\0';
+                break;
+
             case AF_INET:
                 debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
@@ -881,13 +888,30 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 if (strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
                     debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
-                } else
+                }
+                else
                     debug(D_LISTENER, "New IPv6 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
 
             default:
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
+        }
+
+        if(access_list) {
+            if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+                strncpy(client_ip, "localhost", ipsize);
+                client_ip[ipsize - 1] = '\0';
+            }
+
+            if(unlikely(!simple_pattern_matches(access_list, client_ip))) {
+                errno = 0;
+                debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
+                error("DENIED ACCESS to client '%s'", client_ip);
+                close(nfd);
+                nfd = -1;
+                errno = EPERM;
+            }
         }
     }
 #ifdef HAVE_ACCEPT4
@@ -1104,6 +1128,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , void  (*del_callback)(int fd, void *data)
         , int   (*rcv_callback)(int fd, int socktype, void *data, short int *events)
         , int   (*snd_callback)(int fd, int socktype, void *data, short int *events)
+        , SIMPLE_PATTERN *access_list
         , void *data
 ) {
     int retval;
@@ -1182,7 +1207,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                 char client_port[NI_MAXSERV + 1];
 
                                 debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
-                                nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1);
+                                nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1, access_list);
                                 if (nfd < 0) {
                                     // accept failed
 
@@ -1211,6 +1236,8 @@ void poll_events(LISTEN_SOCKETS *sockets
                             // we read data from the server socket
 
                             debug(D_POLLFD, "POLLFD: LISTENER: reading data from UDP slot %zu (fd %d)", i, fd);
+
+                            // FIXME: access_list is not applied to UDP
 
                             p.rcv_callback(fd, pi->socktype, pi->data, &pf->events);
                             break;
