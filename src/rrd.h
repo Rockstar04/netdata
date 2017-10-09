@@ -368,9 +368,9 @@ typedef struct rrdset RRDSET;
 // and may lead to missing information.
 
 typedef enum rrdhost_flags {
-    RRDHOST_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
-    RRDHOST_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
-    RRDHOST_DELETE_ORPHAN_HOST     = 1 << 2  // delete the entire host when orphan
+    RRDHOST_FLAG_ORPHAN                 = 1 << 0, // this host is orphan (not receiving data)
+    RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS = 1 << 1, // delete files of obsolete charts
+    RRDHOST_FLAG_DELETE_ORPHAN_HOST     = 1 << 2  // delete the entire host when orphan
 } RRDHOST_FLAGS;
 
 #ifdef HAVE_C___ATOMIC
@@ -578,7 +578,7 @@ extern void __rrd_check_wrlock(const char *file, const char *function, const uns
 // ----------------------------------------------------------------------------
 // RRDSET functions
 
-extern void rrdset_set_name(RRDSET *st, const char *name);
+extern int rrdset_set_name(RRDSET *st, const char *name);
 
 extern RRDSET *rrdset_create_custom(RRDHOST *host
                              , const char *type
@@ -608,6 +608,8 @@ extern void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);
+
+extern int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now);
 
 extern void rrdset_update_heterogeneous_flag(RRDSET *st);
 

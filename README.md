@@ -60,7 +60,7 @@ Netdata is featured at <b><a href="https://octoverse.github.com/" target="_blank
    collects thousands of metrics per server per second,
    with just 1% CPU utilization of a single core, a few MB of RAM and no disk I/O at all
 
- - **Sophisticated alarming**<br/>
+ - **Sophisticated alerting**<br/>
    hundreds of alarms, **out of the box**!<br/>
    supports dynamic thresholds, hysteresis, alarm templates,
    multiple role-based notification methods (such as email, slack.com,
@@ -210,6 +210,9 @@ This is a list of what it currently monitors:
 - **Redis databases**<br/>
   multiple servers, each showing: operations, hit rate, memory, keys, clients, slaves
 
+- **couchdb**<br/>
+  reads/writes, request methods, status codes, tasks, replication, per-db, etc
+
 - **mongodb**<br/>
   operations, clients, transactions, cursors, connections, asserts, locks, etc
 
@@ -287,7 +290,7 @@ And you can extend it, by writing plugins that collect data from any source, usi
 This is a high level overview of netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![netdata-overview](https://user-images.githubusercontent.com/2662304/30880445-4ba55d24-a30b-11e7-979a-6598f069a590.png)](https://my-netdata.io/infographic.html)
+[![netdata-overview](https://user-images.githubusercontent.com/112292/31050340-85344750-a615-11e7-96a6-ab71f3132189.png)](https://my-netdata.io/infographic.html)
 
 ---
 

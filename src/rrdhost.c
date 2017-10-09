@@ -143,10 +143,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->variables_root_index),   rrdvar_compare);
 
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete obsolete charts files", 1))
-        rrdhost_flag_set(host, RRDHOST_DELETE_OBSOLETE_CHARTS);
+        rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
-        rrdhost_flag_set(host, RRDHOST_DELETE_ORPHAN_HOST);
+        rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
 
     // ------------------------------------------------------------------------
@@ -354,10 +354,10 @@ RRDHOST *rrdhost_find_or_create(
     return host;
 }
 
-static inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
+inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected, time_t now) {
     if(host != protected
        && host != localhost
-       && rrdhost_flag_check(host, RRDHOST_ORPHAN)
+       && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && !host->connected_senders
        && host->senders_disconnected_time
        && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
@@ -376,7 +376,7 @@ restart_after_removal:
         if(rrdhost_should_be_removed(host, protected, now)) {
             info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", host->hostname, host->machine_guid);
 
-            if(rrdhost_flag_check(host, RRDHOST_DELETE_ORPHAN_HOST))
+            if(rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST))
                 rrdhost_delete_charts(host);
             else
                 rrdhost_save_charts(host);
@@ -473,8 +473,12 @@ void rrdhost_free(RRDHOST *host) {
 
     while(host->rrdset_root) rrdset_free(host->rrdset_root);
 
-    while(host->alarms) rrdcalc_free(host, host->alarms);
-    while(host->templates) rrdcalctemplate_free(host, host->templates);
+    while(host->alarms)
+        rrdcalc_unlink_and_free(host, host->alarms);
+
+    while(host->templates)
+        rrdcalctemplate_unlink_and_free(host, host->templates);
+
     health_alarm_log_free(host);
 
 
@@ -586,7 +590,7 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
     info("Cleaning up database of host '%s'...", host->hostname);
 
     RRDSET *st;
-    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS);
+    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
     // we get a write lock
     // to ensure only one thread is saving the database
@@ -632,7 +636,7 @@ void rrdhost_cleanup_all(void) {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if(host != localhost && rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS) && !host->connected_senders)
+        if(host != localhost && rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS) && !host->connected_senders)
             rrdhost_delete_charts(host);
         else
             rrdhost_cleanup_charts(host);
@@ -650,7 +654,7 @@ void rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
 
     RRDSET *st;
 
-    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_DELETE_OBSOLETE_CHARTS);
+    uint32_t rrdhost_delete_obsolete_charts = rrdhost_flag_check(host, RRDHOST_FLAG_DELETE_OBSOLETE_CHARTS);
 
 restart_after_removal:
     rrdset_foreach_write(st, host) {
