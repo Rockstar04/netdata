@@ -237,9 +237,12 @@ CHARTS = {
             ['Threads_connected', 'connected', 'absolute'],
             ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
-            ['Threads_running', 'running', 'absolute'],
-            ['Max_connections_ratio', 'ratio', 'absolute', 1, 1, True]
-        ]},
+            ['Threads_running', 'running', 'absolute']
+        ],
+        'variables': [
+            ['max_connections', None]
+        ]
+    },
     'thread_cache_misses': {
         'options': [None, 'mysql Threads Cache Misses', 'misses', 'threads', 'mysql.thread_cache_misses', 'area'],
         'lines': [
