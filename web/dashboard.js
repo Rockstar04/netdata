@@ -3114,22 +3114,22 @@ var NETDATA = window.NETDATA || {};
             if(series.user !== null) series.user.innerText = s;
         };
 
-        this.__legendSetDateString = function(date) {
-            if(date !== this.tmp.__last_shown_legend_date) {
+        this.legendSetDateString = function(date) {
+            if(this.element_legend_childs.title_date !== null && date !== this.tmp.__last_shown_legend_date) {
                 this.element_legend_childs.title_date.innerText = date;
                 this.tmp.__last_shown_legend_date = date;
             }
         };
 
-        this.__legendSetTimeString = function(time) {
-            if(time !== this.tmp.__last_shown_legend_time) {
+        this.legendSetTimeString = function(time) {
+            if(this.element_legend_childs.title_time !== null && time !== this.tmp.__last_shown_legend_time) {
                 this.element_legend_childs.title_time.innerText = time;
                 this.tmp.__last_shown_legend_time = time;
             }
         };
 
         this.legendSetUnitsString = function(units) {
-            if(units !== this.tmp.__last_shown_legend_units) {
+            if(this.element_legend_childs.title_units !== null && units !== this.tmp.__last_shown_legend_units) {
                 this.element_legend_childs.title_units.innerText = units;
                 this.tmp.__last_shown_legend_units = units;
             }
@@ -3154,25 +3154,15 @@ var NETDATA = window.NETDATA || {};
                 this.legendSetDateLast.time = NETDATA.dateTime.localeTimeString(d);
             }
 
-            if(this.element_legend_childs.title_date !== null)
-                this.__legendSetDateString(this.legendSetDateLast.date);
-
-            if(this.element_legend_childs.title_time !== null)
-                this.__legendSetTimeString(this.legendSetDateLast.time);
-
-            if(this.element_legend_childs.title_units !== null)
-                this.legendSetUnitsString(this.units_current)
+            this.legendSetDateString(this.legendSetDateLast.date);
+            this.legendSetTimeString(this.legendSetDateLast.time);
+            this.legendSetUnitsString(this.units_current)
         };
 
         this.legendShowUndefined = function() {
-            if(this.element_legend_childs.title_date !== null)
-                this.__legendSetDateString(' ');
-
-            if(this.element_legend_childs.title_time !== null)
-                this.__legendSetTimeString(this.chart.name);
-
-            if(this.element_legend_childs.title_units !== null)
-                this.legendSetUnitsString(' ');
+            this.legendSetDateString(this.legendPluginModuleString(false));
+            this.legendSetTimeString(this.chart.context.toString());
+            this.legendSetUnitsString(' ');
 
             if(this.data && this.element_legend_childs.series !== null) {
                 var labels = this.data.dimension_names;
@@ -3334,6 +3324,30 @@ var NETDATA = window.NETDATA || {};
             }
 
             return this.colors;
+        };
+
+        this.legendPluginModuleString = function(withContext) {
+            var str = ' ';
+            var context = '';
+
+            if(typeof this.chart !== 'undefined') {
+                if(withContext && typeof this.chart.context === 'string')
+                    context = this.chart.context;
+
+                if (typeof this.chart.plugin === 'string' && this.chart.plugin !== '') {
+                    str = this.chart.plugin;
+                    if (typeof this.chart.module === 'string' && this.chart.module !== '') {
+                        str += '/' + this.chart.module;
+                    }
+
+                    if (withContext && context !== '')
+                        str += ', ' + context;
+                }
+                else if (withContext && context !== '')
+                    str = context;
+            }
+
+            return str;
         };
 
         this.legendResolutionTooltip = function () {
@@ -3531,7 +3545,7 @@ var NETDATA = window.NETDATA || {};
                         placement: 'bottom',
                         delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                         title: 'Pan Left',
-                        content: 'Pan the chart to the left. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Pan the chart to the left. You can also <b>drag it</b> with your mouse or your finger (on touch devices).<br/><small>Help can be disabled from the settings.</small>'
                     });
 
 
@@ -3551,7 +3565,7 @@ var NETDATA = window.NETDATA || {};
                         placement: 'bottom',
                         delay: { show: NETDATA.options.current.show_help_delay_show_ms, hide: NETDATA.options.current.show_help_delay_hide_ms },
                         title: 'Chart Reset',
-                        content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>'
+                        content: 'Reset all the charts to their default auto-refreshing state. You can also <b>double click</b> the chart contents with your mouse or your finger (on touch devices).<br/><small>Help can be disabled from the settings.</small>'
                     });
 
                     this.element_legend_childs.toolbox_right.className += ' netdata-legend-toolbox-button';
@@ -3669,7 +3683,7 @@ var NETDATA = window.NETDATA || {};
                 }, false);
 
                 if(this.chart) {
-                    this.element_legend_childs.title_date.title = this.chart.context.toString();
+                    this.element_legend_childs.title_date.title = this.legendPluginModuleString(true);
                     this.element_legend_childs.title_time.title = this.legendResolutionTooltip();
                 }
 
@@ -5125,6 +5139,10 @@ var NETDATA = window.NETDATA || {};
                 visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names)
         };
 
+        if(!NETDATA.chartLibraries.dygraph.isSparkline(state)) {
+            options.ylabel = (state.dimensions_visibility.unselected_count !== 0)?"":state.units_current;
+        }
+
         if(state.tmp.dygraph_force_zoom === true) {
             if(NETDATA.options.debug.dygraph === true || state.debug === true)
                 state.log('dygraphChartUpdate() forced zoom update');
@@ -6338,10 +6356,6 @@ var NETDATA = window.NETDATA || {};
                 barColor = tmp;
         }
 
-        state.legendSetUnitsString = function(units) {
-            state.tmp.easyPieChartUnits.innerText = units;
-        };
-
         var pcent = NETDATA.easypiechartPercentFromValueMinMax(state, value, min, max);
         chart.data('data-percent', pcent);
 
@@ -6369,6 +6383,13 @@ var NETDATA = window.NETDATA || {};
         if(animate === false) state.tmp.easyPieChart_instance.disableAnimation();
         state.tmp.easyPieChart_instance.update(pcent);
         if(animate === false) state.tmp.easyPieChart_instance.enableAnimation();
+
+        state.legendSetUnitsString = function(units) {
+            if(typeof state.tmp.easyPieChartUnits !== 'undefined')
+                state.tmp.easyPieChartUnits.innerText = units;
+        };
+        state.legendShowUndefined = function() {};
+
         return true;
     };
 
@@ -6710,13 +6731,6 @@ var NETDATA = window.NETDATA || {};
         if(typeof state.tmp.gauge_instance !== 'undefined')
             animate = false;
 
-        state.legendSetUnitsString = function(units) {
-            state.tmp.gaugeChartUnits.innerText = units;
-            state.tmp.___gaugeOld__.valueLabel = null;
-            state.tmp.___gaugeOld__.minLabel = null;
-            state.tmp.___gaugeOld__.maxLabel = null;
-        };
-
         state.tmp.gauge_instance = new Gauge(state.tmp.gauge_canvas).setOptions(options); // create sexy gauge!
 
         state.tmp.___gaugeOld__ = {
@@ -6736,6 +6750,17 @@ var NETDATA = window.NETDATA || {};
         NETDATA.gaugeSet(state, value, min, max);
         NETDATA.gaugeSetLabels(state, value, min, max);
         NETDATA.gaugeAnimation(state, true);
+
+        state.legendSetUnitsString = function(units) {
+            if(typeof state.tmp.gaugeChartUnits !== 'undefined') {
+                state.tmp.gaugeChartUnits.innerText = units;
+                state.tmp.___gaugeOld__.valueLabel = null;
+                state.tmp.___gaugeOld__.minLabel = null;
+                state.tmp.___gaugeOld__.maxLabel = null;
+            }
+        };
+        state.legendShowUndefined = function() {};
+
         return true;
     };
 

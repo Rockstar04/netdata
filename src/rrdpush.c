@@ -79,35 +79,60 @@ static inline int need_to_send_chart_definition(RRDSET *st) {
 
 // sends the current chart definition
 static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+
     rrdset_flag_set(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
-    buffer_sprintf(st->rrdhost->rrdpush_sender_buffer, "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\"\n"
-                , st->id
-                , st->name
-                , st->title
-                , st->units
-                , st->family
-                , st->context
-                , rrdset_type_name(st->chart_type)
-                , st->priority
-                , st->update_every
-                , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
-                , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
-                , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
+    // send the chart
+    buffer_sprintf(
+            host->rrdpush_sender_buffer
+            , "CHART \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" \"%s\" %ld %d \"%s %s %s\" \"%s\" \"%s\"\n"
+            , st->id
+            , st->name
+            , st->title
+            , st->units
+            , st->family
+            , st->context
+            , rrdset_type_name(st->chart_type)
+            , st->priority
+            , st->update_every
+            , rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)?"obsolete":""
+            , rrdset_flag_check(st, RRDSET_FLAG_DETAIL)?"detail":""
+            , rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST)?"store_first":""
+            , (st->plugin_name)?st->plugin_name:""
+            , (st->module_name)?st->module_name:""
     );
 
+    // send the dimensions
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
-        buffer_sprintf(st->rrdhost->rrdpush_sender_buffer, "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
-                       , rd->id
-                       , rd->name
-                       , rrd_algorithm_name(rd->algorithm)
-                       , rd->multiplier
-                       , rd->divisor
-                       , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
-                       , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+        buffer_sprintf(
+                host->rrdpush_sender_buffer
+                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
+                , rd->id
+                , rd->name
+                , rrd_algorithm_name(rd->algorithm)
+                , rd->multiplier
+                , rd->divisor
+                , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
+                , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
         rd->exposed = 1;
+    }
+
+    // send the chart local custom variables
+    RRDSETVAR *rs;
+    for(rs = st->variables; rs ;rs = rs->next) {
+        if(unlikely(rs->options && RRDVAR_OPTION_ALLOCATED)) {
+            calculated_number *value = (calculated_number *) rs->value;
+
+            buffer_sprintf(
+                    host->rrdpush_sender_buffer
+                    , "VARIABLE CHART %s = " CALCULATED_NUMBER_FORMAT "\n"
+                    , rs->variable
+                    , *value
+            );
+        }
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
@@ -182,6 +207,47 @@ void rrdset_done_push(RRDSET *st) {
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
+static inline void rrdpush_sender_add_host_variable_to_buffer_nolock(RRDHOST *host, RRDVAR *rv) {
+    calculated_number *value = (calculated_number *)rv->value;
+
+    buffer_sprintf(
+            host->rrdpush_sender_buffer
+            , "VARIABLE HOST %s = " CALCULATED_NUMBER_FORMAT "\n"
+            , rv->name
+            , *value
+    );
+
+    debug(D_STREAM, "RRDVAR pushed HOST VARIABLE %s = " CALCULATED_NUMBER_FORMAT, rv->name, *value);
+}
+
+void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, RRDVAR *rv) {
+    if(host->rrdpush_send_enabled && host->rrdpush_sender_spawn && host->rrdpush_sender_connected) {
+        rrdpush_buffer_lock(host);
+        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
+        rrdpush_buffer_unlock(host);
+    }
+}
+
+static int rrdpush_sender_thread_custom_host_variables_callback(void *rrdvar_ptr, void *host_ptr) {
+    RRDVAR *rv = (RRDVAR *)rrdvar_ptr;
+    RRDHOST *host = (RRDHOST *)host_ptr;
+
+    if(unlikely(rv->type == RRDVAR_TYPE_CALCULATED_ALLOCATED)) {
+        rrdpush_sender_add_host_variable_to_buffer_nolock(host, rv);
+
+        // return 1, so that the traversal will return the number of variables sent
+        return 1;
+    }
+
+    // returning a negative number will break the traversal
+    return 0;
+}
+
+static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
+    int ret = rrdvar_callback_for_all_host_variables(host, rrdpush_sender_thread_custom_host_variables_callback, host);
+    debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
+}
+
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
@@ -189,6 +255,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        rrdset_flag_clear(st, RRDSET_FLAG_EXPOSED_UPSTREAM);
 
         st->upstream_resync_time = 0;
 
@@ -213,6 +280,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
     buffer_flush(host->rrdpush_sender_buffer);
 
     rrdpush_sender_thread_reset_all_charts(host);
+    rrdpush_sender_thread_send_custom_host_variables(host);
 
     rrdpush_buffer_unlock(host);
 }

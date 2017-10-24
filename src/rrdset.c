@@ -316,6 +316,9 @@ void rrdset_free(RRDSET *st) {
 
     rrdfamily_free(st->rrdhost, st->rrdfamily);
 
+    debug(D_RRD_CALLS, "RRDSET: Cleaning up remaining chart variables for host '%s', chart '%s'", st->rrdhost->hostname, st->id);
+    rrdvar_free_remaining_variables(st->rrdhost, &st->rrdvar_root_index);
+
     // ------------------------------------------------------------------------
     // unlink it from the host
 
@@ -341,6 +344,8 @@ void rrdset_free(RRDSET *st) {
 
     // free directly allocated members
     freez(st->config_section);
+    freez(st->plugin_name);
+    freez(st->module_name);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -423,6 +428,8 @@ RRDSET *rrdset_create_custom(
         , const char *context
         , const char *title
         , const char *units
+        , const char *plugin
+        , const char *module
         , long priority
         , int update_every
         , RRDSET_TYPE chart_type
@@ -502,7 +509,7 @@ RRDSET *rrdset_create_custom(
         if(st) {
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
-            memset(&st->variables_root_index, 0, sizeof(avl_tree_lock));
+            memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
@@ -514,6 +521,8 @@ RRDSET *rrdset_create_custom(
             st->units = NULL;
             st->context = NULL;
             st->cache_dir = NULL;
+            st->plugin_name = NULL;
+            st->module_name = NULL;
             st->dimensions = NULL;
             st->rrdfamily = NULL;
             st->rrdhost = NULL;
@@ -570,6 +579,9 @@ RRDSET *rrdset_create_custom(
         st = callocz(1, size);
         st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
+
+    st->plugin_name = plugin?strdup(plugin):NULL;
+    st->module_name = module?strdup(module):NULL;
 
     st->config_section = strdup(config_section);
     st->rrdhost = host;
@@ -631,7 +643,7 @@ RRDSET *rrdset_create_custom(
     st->upstream_resync_time = 0;
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
-    avl_init_lock(&st->variables_root_index, rrdvar_compare);
+    avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
@@ -651,11 +663,11 @@ RRDSET *rrdset_create_custom(
     host->rrdset_root = st;
 
     if(host->health_enabled) {
-        rrdsetvar_create(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, 0);
-        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, 0);
-        rrdsetvar_create(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, 0);
-        rrdsetvar_create(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, 0);
-        rrdsetvar_create(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, 0);
+        rrdsetvar_create(st, "last_collected_t",    RRDVAR_TYPE_TIME_T,     &st->last_collected_time.tv_sec, RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "collected_total_raw", RRDVAR_TYPE_TOTAL,      &st->last_collected_total,       RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "green",               RRDVAR_TYPE_CALCULATED, &st->green,                      RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "red",                 RRDVAR_TYPE_CALCULATED, &st->red,                        RRDVAR_OPTION_DEFAULT);
+        rrdsetvar_create(st, "update_every",        RRDVAR_TYPE_INT,        &st->update_every,               RRDVAR_OPTION_DEFAULT);
     }
 
     if(unlikely(rrdset_index_add(host, st) != st))

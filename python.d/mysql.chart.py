@@ -2,7 +2,7 @@
 # Description: MySQL netdata python.d module
 # Author: Pawel Krupa (paulfantom)
 
-from base import MySQLService
+from bases.FrameworkServices.MySQLService import MySQLService
 
 # default module values (can be overridden per job in `config`)
 # update_every = 3
@@ -123,11 +123,13 @@ GLOBAL_STATS = [
  'Connection_errors_select',
  'Connection_errors_tcpwrap']
 
+
 def slave_seconds(value):
     try:
         return int(value)
     except (TypeError, ValueError):
         return -1
+
 
 def slave_running(value):
     return 1 if value == 'Yes' else -1
@@ -231,7 +233,7 @@ CHARTS = {
     'threads': {
         'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
-            ['var_max_connections', 'max', 'absolute'],
+            ['mysql_max_connections', 'max', 'absolute'],
             ['Threads_connected', 'connected', 'absolute'],
             ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
@@ -257,7 +259,8 @@ CHARTS = {
             ['Innodb_data_fsyncs', 'fsyncs', 'incremental']
         ]},
     'innodb_io_pending_ops': {
-        'options': [None, 'mysql InnoDB Pending I/O Operations', 'operations', 'innodb', 'mysql.innodb_io_pending_ops', 'line'],
+        'options': [None, 'mysql InnoDB Pending I/O Operations', 'operations', 'innodb',
+                    'mysql.innodb_io_pending_ops', 'line'],
         'lines': [
             ['Innodb_data_pending_reads', 'reads', 'absolute'],
             ['Innodb_data_pending_writes', 'writes', 'absolute', -1, 1],
@@ -283,7 +286,8 @@ CHARTS = {
             ['Innodb_os_log_written', 'write', 'incremental', -1, 1024],
         ]},
     'innodb_cur_row_lock': {
-        'options': [None, 'mysql InnoDB Current Row Locks', 'operations', 'innodb', 'mysql.innodb_cur_row_lock', 'area'],
+        'options': [None, 'mysql InnoDB Current Row Locks', 'operations', 'innodb',
+                    'mysql.innodb_cur_row_lock', 'area'],
         'lines': [
             ['Innodb_row_lock_current_waits', 'current_waits', 'absolute']
         ]},
@@ -296,7 +300,8 @@ CHARTS = {
             ['Innodb_rows_deleted', 'deleted', 'incremental', -1, 1],
         ]},
     'innodb_buffer_pool_pages': {
-        'options': [None, 'mysql InnoDB Buffer Pool Pages', 'pages', 'innodb', 'mysql.innodb_buffer_pool_pages', 'line'],
+        'options': [None, 'mysql InnoDB Buffer Pool Pages', 'pages', 'innodb',
+                    'mysql.innodb_buffer_pool_pages', 'line'],
         'lines': [
             ['Innodb_buffer_pool_pages_data', 'data', 'absolute'],
             ['Innodb_buffer_pool_pages_dirty', 'dirty', 'absolute', -1, 1],
@@ -313,20 +318,23 @@ CHARTS = {
             ['Innodb_buffer_pool_utilization', 'ratio', 'absolute', 1, 1, True]
         ]},
     'innodb_buffer_pool_read_ahead': {
-        'options': [None, 'mysql InnoDB Buffer Pool Read Ahead', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_read_ahead', 'area'],
+        'options': [None, 'mysql InnoDB Buffer Pool Read Ahead', 'operations/s', 'innodb',
+                    'mysql.innodb_buffer_pool_read_ahead', 'area'],
         'lines': [
             ['Innodb_buffer_pool_read_ahead', 'all', 'incremental'],
             ['Innodb_buffer_pool_read_ahead_evicted', 'evicted', 'incremental', -1, 1],
             ['Innodb_buffer_pool_read_ahead_rnd', 'random', 'incremental']
         ]},
     'innodb_buffer_pool_reqs': {
-        'options': [None, 'mysql InnoDB Buffer Pool Requests', 'requests/s', 'innodb', 'mysql.innodb_buffer_pool_reqs', 'area'],
+        'options': [None, 'mysql InnoDB Buffer Pool Requests', 'requests/s', 'innodb',
+                    'mysql.innodb_buffer_pool_reqs', 'area'],
         'lines': [
             ['Innodb_buffer_pool_read_requests', 'reads', 'incremental'],
             ['Innodb_buffer_pool_write_requests', 'writes', 'incremental', -1, 1]
         ]},
     'innodb_buffer_pool_ops': {
-        'options': [None, 'mysql InnoDB Buffer Pool Operations', 'operations/s', 'innodb', 'mysql.innodb_buffer_pool_ops', 'area'],
+        'options': [None, 'mysql InnoDB Buffer Pool Operations', 'operations/s', 'innodb',
+                    'mysql.innodb_buffer_pool_ops', 'area'],
         'lines': [
             ['Innodb_buffer_pool_reads', 'disk reads', 'incremental'],
             ['Innodb_buffer_pool_wait_free', 'wait free', 'incremental', -1, 1]
@@ -369,7 +377,8 @@ CHARTS = {
             ['Key_write_requests', 'writes', 'incremental', -1, 1]
         ]},
     'key_disk_ops': {
-        'options': [None, 'mysql MyISAM Key Cache Disk Operations', 'operations/s', 'myisam', 'mysql.key_disk_ops', 'area'],
+        'options': [None, 'mysql MyISAM Key Cache Disk Operations', 'operations/s',
+                    'myisam', 'mysql.key_disk_ops', 'area'],
         'lines': [
             ['Key_reads', 'reads', 'incremental'],
             ['Key_writes', 'writes', 'incremental', -1, 1]
@@ -385,13 +394,15 @@ CHARTS = {
             ['Opened_files', 'files', 'incremental']
         ]},
     'binlog_stmt_cache': {
-        'options': [None, 'mysql Binlog Statement Cache', 'statements/s', 'binlog', 'mysql.binlog_stmt_cache', 'line'],
+        'options': [None, 'mysql Binlog Statement Cache', 'statements/s', 'binlog',
+                    'mysql.binlog_stmt_cache', 'line'],
         'lines': [
             ['Binlog_stmt_cache_disk_use', 'disk', 'incremental'],
             ['Binlog_stmt_cache_use', 'all', 'incremental']
         ]},
     'connection_errors': {
-        'options': [None, 'mysql Connection Errors', 'connections/s', 'connections', 'mysql.connection_errors', 'line'],
+        'options': [None, 'mysql Connection Errors', 'connections/s', 'connections',
+                    'mysql.connection_errors', 'line'],
         'lines': [
             ['Connection_errors_accept', 'accept', 'incremental'],
             ['Connection_errors_internal', 'internal', 'incremental'],
@@ -419,8 +430,23 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
+
+        # Query for config data
         self.queries = dict(
-            global_vars=QUERY_VAR,
+            global_vars=QUERY_VAR)
+
+        self.config_data = dict()
+        raw_config_data = self._get_raw_data(description=True)
+
+        if raw_config_data:
+            if 'global_vars' in raw_config_data:
+                global_vars = dict(raw_config_data['global_vars'][0])
+                for key in GLOBAL_VARS:
+                    if key in global_vars:
+                        var_key = 'mysql_%s' % key
+                        self.config_data[var_key] = global_vars[key]
+
+        self.queries = dict(
             global_status=QUERY_GLOBAL,
             slave_status=QUERY_SLAVE)
 
@@ -429,16 +455,9 @@ class Service(MySQLService):
         raw_data = self._get_raw_data(description=True)
 
         if not raw_data:
-           return None
+            return None
 
-        to_netdata = dict()
-
-        if 'global_vars' in raw_data:
-            global_vars = dict(raw_data['global_vars'][0])
-            for key in GLOBAL_VARS:
-                if key in global_vars:
-                    var_key = 'var_%s' % key
-                    to_netdata[var_key] = global_vars[key]
+        to_netdata = self.config_data
 
         if 'global_status' in raw_data:
             global_status = dict(raw_data['global_status'][0])
@@ -447,19 +466,18 @@ class Service(MySQLService):
                     to_netdata[key] = global_status[key]
             if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
                 to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created']) / float(to_netdata['Connections']) * 10000)
-            if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'var_innodb_buffer_pool_size' in to_netdata:
-                to_netdata['Innodb_buffer_pool_utilization'] = (int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['var_innodb_buffer_pool_size']))*100
-            if 'Threads_connected' in to_netdata and 'var_max_connections' in to_netdata:
-                to_netdata['Max_connections_ratio'] = (int(to_netdata['Threads_connected']) / float(to_netdata['var_max_connections']))*100
+            if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'mysql_innodb_buffer_pool_size' in to_netdata:
+                to_netdata['Innodb_buffer_pool_utilization'] = (int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['mysql_innodb_buffer_pool_size']))*100
+            if 'Threads_connected' in to_netdata and 'mysql_max_connections' in to_netdata:
+                to_netdata['Max_connections_ratio'] = (int(to_netdata['Threads_connected']) / float(to_netdata['mysql_max_connections']))*100
 
         if 'slave_status' in raw_data:
             if raw_data['slave_status'][0]:
                 slave_raw_data = dict(zip([e[0] for e in raw_data['slave_status'][1]], raw_data['slave_status'][0][0]))
-                for key, function in SLAVE_STATS:
+                for key, func in SLAVE_STATS:
                     if key in slave_raw_data:
-                       to_netdata[key] = function(slave_raw_data[key])
+                        to_netdata[key] = func(slave_raw_data[key])
             else:
                 self.queries.pop('slave_status')
 
         return to_netdata or None
-
