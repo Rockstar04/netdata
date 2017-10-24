@@ -430,23 +430,8 @@ class Service(MySQLService):
         MySQLService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
-        # Query for config data
         self.queries = dict(
-            global_vars=QUERY_VAR)
-
-        self.config_data = dict()
-        raw_config_data = self._get_raw_data(description=True)
-
-        if raw_config_data:
-            if 'global_vars' in raw_config_data:
-                global_vars = dict(raw_config_data['global_vars'][0])
-                for key in GLOBAL_VARS:
-                    if key in global_vars:
-                        var_key = 'mysql_%s' % key
-                        self.config_data[var_key] = global_vars[key]
-
-        self.queries = dict(
+            global_vars=QUERY_VAR,
             global_status=QUERY_GLOBAL,
             slave_status=QUERY_SLAVE)
 
@@ -457,7 +442,14 @@ class Service(MySQLService):
         if not raw_data:
             return None
 
-        to_netdata = self.config_data
+        to_netdata = dict()
+
+        if 'global_vars' in raw_data:
+            global_vars = dict(raw_data['global_vars'][0])
+            for key in GLOBAL_VARS:
+                if key in global_vars:
+                    var_key = 'mysql_%s' % key
+                    to_netdata[var_key] = global_vars[key]
 
         if 'global_status' in raw_data:
             global_status = dict(raw_data['global_status'][0])
