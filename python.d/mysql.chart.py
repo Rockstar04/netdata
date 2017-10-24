@@ -233,7 +233,7 @@ CHARTS = {
     'threads': {
         'options': [None, 'mysql Threads', 'threads', 'threads', 'mysql.threads', 'line'],
         'lines': [
-            ['mysql_max_connections', 'max', 'absolute'],
+            ['max_connections', 'max', 'absolute'],
             ['Threads_connected', 'connected', 'absolute'],
             ['Threads_created', 'created', 'incremental'],
             ['Threads_cached', 'cached', 'absolute', -1, 1],
@@ -448,7 +448,7 @@ class Service(MySQLService):
             global_vars = dict(raw_data['global_vars'][0])
             for key in GLOBAL_VARS:
                 if key in global_vars:
-                    var_key = 'mysql_%s' % key
+                    var_key = '%s' % key
                     to_netdata[var_key] = global_vars[key]
 
         if 'global_status' in raw_data:
@@ -458,10 +458,10 @@ class Service(MySQLService):
                     to_netdata[key] = global_status[key]
             if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
                 to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created']) / float(to_netdata['Connections']) * 10000)
-            if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'mysql_innodb_buffer_pool_size' in to_netdata:
-                to_netdata['Innodb_buffer_pool_utilization'] = (int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['mysql_innodb_buffer_pool_size']))*100
-            if 'Threads_connected' in to_netdata and 'mysql_max_connections' in to_netdata:
-                to_netdata['Max_connections_ratio'] = (int(to_netdata['Threads_connected']) / float(to_netdata['mysql_max_connections']))*100
+            if 'Innodb_buffer_pool_bytes_data' in to_netdata and 'innodb_buffer_pool_size' in to_netdata:
+                to_netdata['Innodb_buffer_pool_utilization'] = (int(to_netdata['Innodb_buffer_pool_bytes_data']) / float(to_netdata['innodb_buffer_pool_size']))*100
+            if 'Threads_connected' in to_netdata and 'max_connections' in to_netdata:
+                to_netdata['Max_connections_ratio'] = (int(to_netdata['Threads_connected']) / float(to_netdata['max_connections']))*100
 
         if 'slave_status' in raw_data:
             if raw_data['slave_status'][0]:
